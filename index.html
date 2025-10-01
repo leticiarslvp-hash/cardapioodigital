@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doce Vício - Cardápio Digital</title>
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="C:\Users\Windows 10\Pictures\DOCE VÍCIO\Logo doce vício.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&display=swap');
+
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #4b2e1e; margin: 0; padding: 0; color: #fff; }
+
+  /* Banner de promoção das terças */
+  #bannerPromocao {
+    display: none; /* será ativado apenas na terça */
+    background: linear-gradient(90deg, #d4af37, #b8860b);
+    color: #fff;
+    text-align: center;
+    padding: 18px 10px;
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'Playfair Display', serif;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  .header { position: relative; text-align: center; overflow: visible; }
+  .header img.cabecalho-img { width: 100%; height: 400px; object-fit: cover; filter: brightness(70%); transition: transform 0.5s ease; }
+  .header img.cabecalho-img:hover { transform: scale(1.05); }
+  .header img.logo { position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); width: 180px; height: 180px; border-radius: 50%; background: #fff; padding: 15px; border: 4px solid #d4af37; box-shadow: 0 8px 30px rgba(0,0,0,0.25); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+  .header img.logo:hover { transform: translateX(-50%) scale(1.05); box-shadow: 0 12px 35px rgba(0,0,0,0.35); }
+
+  h2 { text-align: center; margin-top: 150px; color: #d4af37; font-size: 36px; letter-spacing: 1px; font-weight: 700; font-family: 'Playfair Display', serif; }
+
+  .categoria { margin: 60px 0; padding: 40px 20px; color: #fdf8f2; }
+  .categoria h3 { color: #d4af37; border-bottom: 3px solid #d4af37; padding-bottom: 8px; margin-bottom: 35px; font-size: 24px; font-weight: 600; font-family: 'Playfair Display', serif; text-align: center; }
+
+  .produto { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; }
+  .produto-card { background: #fff; border-radius: 15px; box-shadow: 0 6px 25px rgba(0,0,0,0.08); overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; flex: 1 1 250px; max-width: 300px; display: flex; flex-direction: column; border: 2px solid transparent; color: #3e3e3e; opacity: 0; transform: translateY(20px); }
+  .produto-card.aparecer { opacity: 1; transform: translateY(0); transition: all 0.6s ease; }
+  .produto-card:hover { transform: translateY(-5px); box-shadow: 0 12px 35px rgba(0,0,0,0.2); border-color: #d4af37; }
+  .produto-card img { width: 100%; height: 200px; object-fit: cover; transition: transform 0.4s ease; border-bottom: 2px solid #d4af37; }
+  .produto-card img:hover { transform: scale(1.05); }
+  .produto-info { padding: 15px; display: flex; flex-direction: column; flex: 1; }
+  .produto-info h4 { margin: 0 0 8px 0; font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; color: #3e3e3e; }
+  .produto-info p { margin: 0 0 4px 0; font-size: 15px; flex: 1; color: #5a5a5a; }
+  .produto-info .peso { font-size: 13px; color: #7a7a7a; margin-top:0; margin-bottom:12px; }
+  .produto-info button { padding: 14px 24px; font-size: 16px; background: linear-gradient(135deg, #d4af37, #b8860b); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(212,175,55,0.3); }
+  .produto-info button:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 25px rgba(212,175,55,0.5); }
+
+  #clienteForm { margin: 30px 20px; padding: 25px; background: #3e2a1a; border-radius: 12px; border: 1px solid #d4af37; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+  #clienteForm h3 { color: #d4af37; margin-top: 0; font-size: 22px; font-family: 'Playfair Display', serif; }
+  #clienteForm label { display: block; margin: 12px 0 6px; font-weight: 600; color: #fff; }
+  #clienteForm input, #clienteForm textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; background: #fff; transition: all 0.3s ease; }
+  #clienteForm input:focus, #clienteForm textarea:focus { outline: none; border: 1px solid #d4af37; box-shadow: 0 0 8px rgba(212,175,55,0.4); }
+  #clienteForm textarea { resize: vertical; }
+
+  #carrinhoContainer { padding: 30px 20px; background: #3e2a1a; border-top: 2px solid #d4af37; }
+  #carrinhoContainer h2 { margin-top: 0; color: #d4af37; font-size: 22px; font-weight: 600; font-family: 'Playfair Display', serif; }
+  #carrinhoLista li { margin-bottom: 8px; font-size: 16px; color: #fff; }
+  #totalPedido { font-weight: bold; margin-top: 10px; font-size: 18px; color: #fff; }
+  #whatsappBtn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 320px; margin: 20px auto 0; padding: 16px; background: #25D366; color: #fff; border: none; cursor: pointer; border-radius: 8px; font-size: 18px; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(37,211,102,0.4); }
+  #whatsappBtn:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 25px rgba(37,211,102,0.6); }
+  #whatsappBtn img { width: 22px; height: 22px; }
+
+  @media (max-width: 768px) {
+    .produto-card { max-width: 90%; }
+    .header img.logo { width: 150px; height: 150px; bottom: -30px; padding: 12px; }
+    h2 { margin-top: 120px; font-size: 30px; }
+    #clienteForm input, #clienteForm textarea, #whatsappBtn { font-size: 18px; padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Banner promocional das terças -->
+<div id="bannerPromocao">Terça-feira é dia de Doce Vício! <strong>10% OFF</strong> na compra de qualquer produto!</div>
+
+<div class="header">
+  <img src="asserts/Sobremesa de Brownie com Sorvete.png" alt="Doce destaque" class="cabecalho-img">
+  <img src="asserts/logo alta qualidade.png" alt="Doce Vício" class="logo">
+</div>
+
+<h2>Cardápio Digital</h2>
+
+<!-- CATEGORIAS E PRODUTOS - MANTIDOS INTEIROS DO SEU CÓDIGO ORIGINAL -->
+
+<!-- BOLOS NO POTE -->
+<div class="categoria">
+  <h3>BOLOS NO POTE</h3>
+  <div class="produto">
+    <div class="produto-card">
+      <img src="asserts/bolo no pote chocolate.png" alt="Bolo Brigadeiro">
+      <div class="produto-info">
+        <h4>Brigadeiro <span>R$ 14,99</span></h4>
+        <p>Massa fofinha de chocolate recheada com muito brigadeiro cremoso, feita pra derreter na boca a cada colherada.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Bolo Brigadeiro" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+    <div class="produto-card">
+      <img src="asserts/Sobremesa de Chocolate e Creme.png" alt="Bolo Prestígio">
+      <div class="produto-info">
+        <h4>Prestígio <span>R$ 14,99</span></h4>
+        <p>A união perfeita do bolo de chocolate úmido com recheio cremoso de coco, um clássico que nunca decepciona.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Bolo Prestígio" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+    <div class="produto-card">
+      <img src="asserts/bolo no pote cenoura com chocolate.png" alt="Bolo Cenoura com Brigadeiro">
+      <div class="produto-info">
+        <h4>Cenoura com Brigadeiro <span>R$ 14,99</span></h4>
+        <p>O bolo de cenoura fofinho coberto com uma camada generosa de brigadeiro caseiro — sabor de infância em versão ainda mais gostosa.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Bolo Cenoura com Brigadeiro" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+    <div class="produto-card">
+      <img src="asserts/dois amores editado.png" alt="Bolo Dois Amores">
+      <div class="produto-info">
+        <h4>Dois Amores <span>R$ 14,99</span></h4>
+        <p>Camadas irresistíveis de brigadeiro preto e brigadeiro branco, formando a dupla perfeita para quem ama equilíbrio entre intensidade e suavidade.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Bolo Dois Amores" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+    <div class="produto-card">
+      <img src="asserts/bolo no pote maracujá2.png" alt="Bolo Maracujá">
+      <div class="produto-info">
+        <h4>Maracujá <span>R$ 14,99</span></h4>
+        <p>Massa leve e fofa com creme de maracujá azedinho na medida certa, refrescante e apaixonante.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Bolo Maracujá" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AFOGADINHOS DE BROWNIE -->
+<div class="categoria">
+  <h3>AFOGADINHOS DE BROWNIE</h3>
+  <div class="produto">
+    <div class="produto-card">
+      <img src="asserts/afogadinho de brownie dois amores editado.png" alt="Afogadinho Dois Amores">
+      <div class="produto-info">
+        <h4>Dois Amores <span>R$ 14,50</span></h4>
+        <p>Brownie macio e chocolatudo mergulhado em brigadeiro branco e preto, criando uma experiência única a cada colherada.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Afogadinho Dois Amores" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+    <div class="produto-card">
+      <img src="asserts/afogadinho de brownie brigadeiro chocolate branco editado.png" alt="Afogadinho Chocolate Branco">
+      <div class="produto-info">
+        <h4>Chocolate Branco <span>R$ 14,50</span></h4>
+        <p>Brownie intenso de chocolate com uma cobertura farta de brigadeiro branco cremoso.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Afogadinho Chocolate Branco" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MOUSSES -->
+<div class="categoria">
+  <h3>MOUSSES</h3>
+  <div class="produto">
+    <div class="produto-card">
+      <img src="asserts/mousse de maracuja com nujtella editado.png" alt="Mousse Maracujá com Nutella">
+      <div class="produto-info">
+        <h4>Maracujá com Nutella <span>R$ 14,70</span></h4>
+        <p>Mousse leve e aerado de maracujá com camadas generosas de Nutella, unindo frescor e cremosidade em um doce inesquecível.</p>
+        <p class="peso">Aprox. 250g</p>
+        <button data-nome="Mousse Maracujá com Nutella" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SALGADOS -->
+<div class="categoria">
+  <h3>SALGADOS</h3>
+  <div class="produto">
+    <div class="produto-card">
+      <img src="asserts/mini empadão.png" alt="Mini Empadão">
+      <div class="produto-info">
+        <h4>Mini Empadão <span>R$ 15,20</span></h4>
+        <p>Uma massa podre deliciosa, recheado com frango desfiado bem temperado e uma generosa camada de requeijão cremoso que derrete na boca.</p>
+        <p class="peso">Aprox. 350g</p>
+        <button data-nome="Mini Empadão" onclick="addToCart(this)">Adicionar (0)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Formulário do cliente -->
+<div id="clienteForm">
+  <h3>Informações do Cliente</h3>
+  <label for="nomeCliente">Nome:</label>
+  <input type="text" id="nomeCliente" placeholder="Digite seu nome e sobrenome">
+  <label for="telefoneCliente">Número para contato:</label>
+  <input type="text" id="telefoneCliente" placeholder="Digite seu telefone">
+  <label for="enderecoCliente">Endereço:</label>
+  <input type="text" id="enderecoCliente" placeholder="Digite seu endereço com n° da casa/apto">
+  <label for="anotacoesCliente">Anotações / Preferências (opcional):</label>
+  <textarea id="anotacoesCliente" rows="3" placeholder="Digite algo especial para o pedido"></textarea>
+</div>
+
+<!-- Carrinho -->
+<div id="carrinhoContainer">
+  <h2>Resumo do Pedido</h2>
+  <ul id="carrinhoLista"></ul>
+  <p id="totalPedido">Total: R$ 0,00</p>
+</div>
+
+<button id="whatsappBtn">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp">
+  Enviar Pedido via WhatsApp
+</button>
+
+<script>
+  // Banner aparece apenas na terça
+  const banner = document.getElementById('bannerPromocao');
+  const hoje = new Date().getDay(); // 0-dom,1-seg,2-ter...
+  if(hoje === 2){ // terça-feira
+    banner.style.display = 'block';
+  }
+
+  let carrinho = [];
+  function addToCart(botao) {
+    const nome = botao.dataset.nome;
+    const index = carrinho.findIndex(item => item.nome === nome);
+    if(index === -1){
+      carrinho.push({nome:nome, quantidade:1});
+    } else {
+      carrinho[index].quantidade++;
+    }
+    atualizarCarrinho();
+    botao.textContent = `Adicionar (${carrinho.find(item => item.nome === nome).quantidade})`;
+  }
+
+  function atualizarCarrinho() {
+    const lista = document.getElementById('carrinhoLista');
+    lista.innerHTML = '';
+    let total = 0;
+    carrinho.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = `${item.nome} x ${item.quantidade}`;
+      lista.appendChild(li);
+
+      // Valores fixos conforme produtos
+      let valor = 0;
+      if(item.nome.includes("Bolo")) valor = 14.99;
+      else if(item.nome.includes("Afogadinho")) valor = 14.50;
+      else if(item.nome.includes("Mousse")) valor = 14.70;
+      else if(item.nome.includes("Empadão")) valor = 15.20;
+      total += valor * item.quantidade;
+    });
+    document.getElementById('totalPedido').textContent = `Total: R$ ${total.toFixed(2)}`;
+  }
+
+  document.getElementById('whatsappBtn').addEventListener('click', ()=>{
+    const nome = document.getElementById('nomeCliente').value;
+    const telefone = document.getElementById('telefoneCliente').value;
+    const endereco = document.getElementById('enderecoCliente').value;
+    const anotacoes = document.getElementById('anotacoesCliente').value;
+    if(!nome || !telefone || !endereco){
+      alert("Por favor, preencha os campos obrigatórios: Nome, telefone e endereço.");
+      return;
+    }
+    let mensagem = `Olá, gostaria de fazer um pedido:%0A`;
+    carrinho.forEach(item=>{
+      mensagem += `${item.nome} x ${item.quantidade}%0A`;
+    });
+    mensagem += `Total: R$ ${document.getElementById('totalPedido').textContent.split("R$ ")[1]}%0A`;
+    mensagem += `Nome: ${nome}%0ATelefone: ${telefone}%0AEndereço: ${endereco}%0AAnotações: ${anotacoes}`;
+    const url = `https://wa.me/5583986153575?text=${mensagem}`;
+    window.open(url, '_blank');
+  });
+
+  // Animação de aparição dos cards
+  window.addEventListener('load', ()=>{
+    document.querySelectorAll('.produto-card').forEach((card, i)=>{
+      setTimeout(()=>{ card.classList.add('aparecer'); }, i*100);
+    });
+  });
+</script>
+
+</body>
+</html>
+
+</html>
+
