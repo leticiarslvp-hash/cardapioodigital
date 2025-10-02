@@ -351,8 +351,8 @@ h2 {
 
 <!-- Botão retangular no final -->
 <button id="whatsappBtnFinal">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp">
-    Enviar Pedido pelo WhatsApp
+  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp">
+  Enviar Pedido pelo WhatsApp
 </button>
 
 <!-- Botão fixo no canto inferior direito -->
@@ -414,13 +414,14 @@ document.getElementById('whatsappBtnFinal').addEventListener('click', ()=>{
         alert("Por favor, preencha os campos obrigatórios: Nome, telefone e endereço.");
         return;
     }
-
+    let numeroPedido = document.getElementById('numeroPedido').textContent;
     let mensagem = `Olá, gostaria de fazer um pedido:%0A`;
     carrinho.forEach(item=>{
-        mensagem += `${item.nome} x ${item.quantidade}%0A`;
+        mensagem += `${numeroPedido}%0A`;
+        mensagem += `${item.nome} x ${item.quantidade}%0A%0A`;
     });
-    mensagem += `Total: R$ ${document.getElementById('totalPedido').textContent.split("R$ ")[1]}%0A`;
-    mensagem += `Nome: ${nome}%0ATelefone: ${telefone}%0AEndereço: ${endereco}%0AAnotações: ${anotacoes}`;
+    mensagem += `TOTAL: R$ ${document.getElementById('totalPedido').textContent.split("R$ ")[1]}%0A`;
+    mensagem += `NOME: ${nome}%0ATELEFONE: ${telefone}%0AENDEREÇO: ${endereco}%0AANOTAÇÕES: ${anotacoes}`;
 
     const url = `https://wa.me/5583986153575?text=${mensagem}`;
     window.open(url, '_blank');
@@ -444,5 +445,4 @@ function scrollRight(btn){
 
 </body>
 </html>
-
 
