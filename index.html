@@ -38,7 +38,7 @@
     
     .container{
       display:flex;
-      flex-direction:column; /* empilha verticalmente */
+      flex-direction:column;
       gap:20px;
       padding:18px;
       max-width:1100px;
@@ -201,10 +201,10 @@
 
   <!-- Firebase + Script de produtos e avaliações -->
   <script type="module">
-    // ===================== Firebase & Reviews =====================
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
+    // === configuração firebase (substitua pelos seus dados) ===
     const firebaseConfig = {
       apiKey: "SUA_API_KEY",
       authDomain: "SEU_AUTH_DOMAIN",
@@ -218,11 +218,12 @@
     const db = getFirestore(app);
     const reviewsCol = collection(db, "reviews");
 
+    // elementos da UI
     const reviewsListEl = document.getElementById("reviewsList");
     const reviewsAverageEl = document.getElementById("reviewsAverage");
     const starInputsEl = document.getElementById("starInputs");
 
-    // Criar inputs de estrelas
+    // criar inputs de estrela
     for (let i = 5; i >= 1; i--) {
       const label = document.createElement("label");
       label.style.cursor = "pointer";
@@ -246,42 +247,53 @@
 
       starInputsEl.appendChild(label);
     }
-
     document.querySelectorAll("#starInputs label").forEach(l => l.style.color = "#ccc");
 
+    // carregar avaliações do Firestore
     async function loadReviewsFromFirebase() {
-      const q = query(reviewsCol, orderBy("timestamp", "desc"));
-      const snapshot = await getDocs(q);
-      const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      reviewsListEl.innerHTML = "";
-      reviews.forEach(r => {
-        const el = document.createElement("div");
-        el.className = "review";
-        el.innerHTML = `<div class="stars">${'★'.repeat(r.stars)+'☆'.repeat(5-r.stars)}</div><div>${r.text}</div>`;
-        reviewsListEl.appendChild(el);
-      });
-      if (reviews.length > 0) {
-        const avg = (reviews.reduce((a,b)=>a+b.stars,0)/reviews.length).toFixed(1);
-        reviewsAverageEl.textContent = `⭐ ${avg} — ${reviews.length} avaliação${reviews.length>1?'s':''}`;
-      } else {
-        reviewsAverageEl.textContent = "⭐ 0 — 0 avaliações";
+      try {
+        const q = query(reviewsCol, orderBy("timestamp", "desc"));
+        const snapshot = await getDocs(q);
+        const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        reviewsListEl.innerHTML = "";
+        reviews.forEach(r => {
+          const el = document.createElement("div");
+          el.className = "review";
+          const stars = Number(r.stars) || 0;
+          el.innerHTML = `<div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><div>${r.text || ''}</div>`;
+          reviewsListEl.appendChild(el);
+        });
+        if (reviews.length > 0) {
+          const avg = (reviews.reduce((a,b)=>a+(Number(b.stars)||0),0)/reviews.length).toFixed(1);
+          reviewsAverageEl.textContent = `⭐ ${avg} — ${reviews.length} avaliação${reviews.length>1?'s':''}`;
+        } else {
+          reviewsAverageEl.textContent = "⭐ 0 — 0 avaliações";
+        }
+      } catch (e) {
+        console.error("Erro carregando avaliações:", e);
       }
     }
 
+    // envio de avaliação
     document.getElementById("submitReview").addEventListener("click", async ()=>{
-      const stars = Number(document.querySelector('input[name="star"]:checked')?.value||0);
-      const text = document.getElementById("reviewText").value.trim();
-      if(stars===0 || !text){alert("Selecione estrelas e escreva seu comentário.");return;}
-      await addDoc(reviewsCol,{stars,text,timestamp:Date.now()});
-      document.getElementById("reviewText").value="";
-      document.querySelectorAll('input[name="star"]').forEach(i=>i.checked=false);
-      document.querySelectorAll("#starInputs label").forEach(l=>l.style.color="#ccc");
-      loadReviewsFromFirebase();
+      try {
+        const stars = Number(document.querySelector('input[name="star"]:checked')?.value||0);
+        const text = document.getElementById("reviewText").value.trim();
+        if(stars===0 || !text){ alert("Selecione estrelas e escreva seu comentário."); return; }
+        await addDoc(reviewsCol, { stars, text, timestamp: serverTimestamp() });
+        document.getElementById("reviewText").value = "";
+        document.querySelectorAll('input[name="star"]').forEach(i => i.checked = false);
+        document.querySelectorAll("#starInputs label").forEach(l => l.style.color = "#ccc");
+        loadReviewsFromFirebase();
+      } catch (err) {
+        console.error("Erro ao enviar avaliação:", err);
+        alert("Ocorreu um erro ao enviar sua avaliação. Verifique a configuração do Firebase no console.");
+      }
     });
 
     document.getElementById("reviewsSummary").addEventListener("click",()=>{
       const card=document.getElementById("reviewsCard");
-      card.style.display = card.style.display==="none"?"block":"block";
+      card.style.display = "block";
       window.scrollTo({top:card.offsetTop-20,behavior:"smooth"});
     });
 
@@ -303,21 +315,20 @@
 
     const WA_NUMBER='5583986153575';
     let cart=[];
+
     const productListEl=document.getElementById('productList');
     const cartCountEl=document.getElementById('cartCount');
     const cartItemsEl=document.getElementById('cartItems');
     const cartTotalEl=document.getElementById('cartTotal');
 
-    function formatPrice(v){return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
-    function randInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
-    function genOrderNumber(){return 'DV-' + String(randInt(10000,99999));}
+    function formatPrice(v){ return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 
     function renderProducts(){
-      productListEl.innerHTML='';
-      data.products.forEach(p=>{
-        const el=document.createElement('div');
-        el.className='product';
-        el.innerHTML=`
+      productListEl.innerHTML = '';
+      data.products.forEach(p => {
+        const el = document.createElement('div');
+        el.className = 'product';
+        el.innerHTML = `
           <img src="${p.image}" alt="${p.name}" loading="lazy"/>
           <div class="product-info">
             <h3>${p.name}</h3>
@@ -328,74 +339,98 @@
             </div>
           </div>
           <div class="controls">
+            <span class="product-qty" style="font-weight:700;color:var(--brown);margin-bottom:6px">0</span>
             <button class="add-btn" data-id="${p.id}">Adicionar</button>
           </div>
         `;
+        el.querySelector('.add-btn').addEventListener('click', () => addToCart(p.id));
         productListEl.appendChild(el);
       });
-      document.querySelectorAll('.add-btn').forEach(btn=>{btn.addEventListener('click',()=>{addToCart(Number(btn.dataset.id));});});
-    }
-
-    function addToCart(id){
-      const item=cart.find(i=>i.id===id);
-      if(item)item.qty++; else cart.push({...data.products.find(p=>p.id===id),qty:1});
-      renderCart();
     }
 
     function renderCart(){
-      cartCountEl.textContent=cart.reduce((a,b)=>a+b.qty,0);
-      cartItemsEl.innerHTML='';
-      let total=0;
-      cart.forEach(item=>{
-        total+=item.price*item.qty;
-        const el=document.createElement('div');
-        el.className='cart-item';
-        el.innerHTML=`
+      cartCountEl.textContent = cart.reduce((a,b)=>a+b.qty,0);
+      cartItemsEl.innerHTML = '';
+      let total = 0;
+      cart.forEach(item => {
+        total += item.price * item.qty;
+        const el = document.createElement('div');
+        el.className = 'cart-item';
+        el.innerHTML = `
           <img src="${item.image}" alt="${item.name}"/>
           <div style="flex:1">
             <div style="font-weight:600;font-size:14px">${item.name}</div>
             <div class="qty">
-              <button onclick="decreaseQty(${item.id})">-</button>
+              <button>-</button>
               <span>${item.qty}</span>
-              <button onclick="increaseQty(${item.id})">+</button>
+              <button>+</button>
             </div>
           </div>
           <div style="font-size:14px">${formatPrice(item.price*item.qty)}</div>
         `;
+        const btns = el.querySelectorAll('button');
+        btns[0].addEventListener('click', () => decreaseQty(item.id));
+        btns[1].addEventListener('click', () => increaseQty(item.id));
         cartItemsEl.appendChild(el);
       });
-      cartTotalEl.textContent='Total: '+formatPrice(total);
+      cartTotalEl.textContent = 'Total: ' + formatPrice(total);
+
+      document.querySelectorAll('.product').forEach(prodEl => {
+        const btn = prodEl.querySelector('.add-btn');
+        if (!btn) return;
+        const id = Number(btn.dataset.id);
+        const cartItem = cart.find(c => c.id === id);
+        const qtySpan = prodEl.querySelector('.product-qty');
+        if (qtySpan) qtySpan.textContent = cartItem ? cartItem.qty : 0;
+      });
+    }
+
+    function addToCart(id){
+      const item = cart.find(i => i.id === id);
+      if (item) item.qty++;
+      else {
+        const prod = data.products.find(p => p.id === id);
+        cart.push({...prod, qty: 1});
+      }
+      renderCart();
     }
 
     function decreaseQty(id){
-      const item=cart.find(i=>i.id===id);
-      if(!item)return;
+      const item = cart.find(i => i.id === id);
+      if (!item) return;
       item.qty--;
-      if(item.qty<=0)cart=cart.filter(i=>i.id!==id);
+      if (item.qty <= 0) cart = cart.filter(i => i.id !== id);
       renderCart();
     }
-    function increaseQty(id){addToCart(id);}
 
-    document.getElementById('checkoutBtn').addEventListener('click',()=>{
-      if(cart.length===0){alert('Adicione algum produto antes de finalizar!');return;}
-      const form=document.getElementById('customerForm');
-      if(!form.checkValidity()){form.reportValidity();return;}
-      const name=form.firstName.value+' '+form.lastName.value;
-      const address=form.address.value;
-      const contact=form.contact.value;
-      const notes=form.notes.value;
-      let msg=`*Pedido Doce Vício*\nNome: ${name}\nEndereço: ${address}\nContato: ${contact}\nObservações: ${notes}\n\nProdutos:\n`;
-      cart.forEach(item=>{msg+=`- ${item.name} (${item.qty}x) = ${formatPrice(item.price*item.qty)}\n`;});
-      msg+=`\n*Total:* ${formatPrice(cart.reduce((a,b)=>a+b.price*b.qty,0))}\nPedido: ${genOrderNumber()}`;
-      window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`,'_blank');
-    });
+    function increaseQty(id){ addToCart(id); }
+
+    window.addToCart = addToCart;
+    window.decreaseQty = decreaseQty;
+    window.increaseQty = increaseQty;
 
     renderProducts();
     renderCart();
+
+    document.getElementById('checkoutBtn').addEventListener('click', () => {
+      if (cart.length === 0) { alert('Adicione algum produto antes de finalizar!'); return; }
+      const form = document.getElementById('customerForm');
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      const name = form.firstName.value + ' ' + form.lastName.value;
+      const address = form.address.value;
+      const contact = form.contact.value;
+      const notes = form.notes.value;
+      let msg = `*Pedido Doce Vício*\nNome: ${name}\nEndereço: ${address}\nContato: ${contact}\nObservações: ${notes}\n\nProdutos:\n`;
+      cart.forEach(item => { msg += `- ${item.name} (${item.qty}x) = ${formatPrice(item.price * item.qty)}\n`; });
+      msg += `\n*Total:* ${formatPrice(cart.reduce((a,b)=>a+b.price*b.qty,0))}\nPedido: DV-${Math.floor(Math.random()*90000+10000)}`;
+      window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
+    });
+
   </script>
 
 </body>
 </html>
+
 
 
 
