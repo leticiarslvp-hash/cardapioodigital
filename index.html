@@ -179,7 +179,8 @@
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
           <div id="starInputs" style="display:flex;gap:6px"></div>
         </div>
-
+        
+        <input id="review-name" type="text" placeholder="Seu nome" />
         <textarea id="reviewText" placeholder="Deixe um comentário breve..." rows="2"></textarea>
         <button id="submitReview" style="margin-top:8px;background:var(--gold);border:none;padding:8px;border-radius:8px;font-weight:700;cursor:pointer">Enviar avaliação</button>
 
@@ -202,7 +203,7 @@
   <!-- Firebase + Script de produtos e avaliações -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
   const firebaseConfig = {
   apiKey: "AIzaSyD5TQRn_pldHdZNio9yrKVQj7QnZGhChOI",
@@ -263,7 +264,8 @@
           const el = document.createElement("div");
           el.className = "review";
           const stars = Number(r.stars) || 0;
-          el.innerHTML = `<div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><div>${r.text || ''}</div>`;
+          // mostrar também o nome da pessoa
+          el.innerHTML = `<div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><div><strong>${r.name || 'Anônimo'}</strong></div><div>${r.text || ''}</div>`;
           reviewsListEl.appendChild(el);
         });
         if (reviews.length > 0) {
@@ -276,15 +278,38 @@
         console.error("Erro carregando avaliações:", e);
       }
     }
+    // Atualização em tempo real das avaliações
+const qRealtime = query(reviewsCol, orderBy("timestamp", "desc"));
+onSnapshot(qRealtime, (snapshot) => {
+  const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  reviewsListEl.innerHTML = "";
+  reviews.forEach(r => {
+    const el = document.createElement("div");
+    el.className = "review";
+    const stars = Number(r.stars) || 0;
+    // mostrar também o nome da pessoa
+    el.innerHTML = `<div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><div><strong>${r.name || 'Anônimo'}</strong></div><div>${r.text || ''}</div>`;
+    reviewsListEl.appendChild(el);
+  });
+  if (reviews.length > 0) {
+    const avg = (reviews.reduce((a,b)=>a+(Number(b.stars)||0),0)/reviews.length).toFixed(1);
+    reviewsAverageEl.textContent = `⭐ ${avg} — ${reviews.length} avaliação${reviews.length>1?'s':''}`;
+  } else {
+    reviewsAverageEl.textContent = "⭐ 0 — 0 avaliações";
+  }
+});
+
 
     // envio de avaliação
     document.getElementById("submitReview").addEventListener("click", async ()=>{
       try {
         const stars = Number(document.querySelector('input[name="star"]:checked')?.value||0);
         const text = document.getElementById("reviewText").value.trim();
+        const name = document.getElementById("review-name").value.trim() || "Anônimo"; // pega o nome
         if(stars===0 || !text){ alert("Selecione estrelas e escreva seu comentário."); return; }
-        await addDoc(reviewsCol, { stars, text, timestamp: serverTimestamp() });
+        await addDoc(reviewsCol, { name, stars, text, timestamp: serverTimestamp() }); // salva com o name
         document.getElementById("reviewText").value = "";
+        document.getElementById("review-name").value = ""; // limpa o campo do nome
         document.querySelectorAll('input[name="star"]').forEach(i => i.checked = false);
         document.querySelectorAll("#starInputs label").forEach(l => l.style.color = "#ccc");
         loadReviewsFromFirebase();
