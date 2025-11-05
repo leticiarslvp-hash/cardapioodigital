@@ -92,6 +92,8 @@
     .social-footer{margin-top:24px;text-align:center;padding:12px 0;background:var(--brown);color:var(--white);border-radius:12px;font-size:14px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;}
     .social-footer a{color:var(--white);text-decoration:none;font-weight:600}
     #reviewsSummary{margin:16px auto;max-width:600px;text-align:center;cursor:pointer;}
+    .small-muted{font-size:12px;color:var(--muted)}
+    .delete-btn{background:transparent;border:1px solid #ddd;padding:4px 8px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:8px}
   </style>
 </head>
 <body>
@@ -203,7 +205,7 @@
   <!-- Firebase + Script de produtos e avaliações -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
 
   const firebaseConfig = {
   apiKey: "AIzaSyD5TQRn_pldHdZNio9yrKVQj7QnZGhChOI",
@@ -224,95 +226,123 @@
     const reviewsAverageEl = document.getElementById("reviewsAverage");
     const starInputsEl = document.getElementById("starInputs");
 
-    // criar inputs de estrela
-    for (let i = 5; i >= 1; i--) {
+    // variável para controlar estrelas selecionadas corretamente
+    let selectedStars = 0;
+
+    // Gera/recupera clientId local para permitir exclusão só do autor
+    function getClientId(){
+      let id = localStorage.getItem('dv_clientId');
+      if(!id){
+        // usa crypto.randomUUID se disponível
+        if(window.crypto && crypto.randomUUID) id = crypto.randomUUID();
+        else id = 'cid-' + Math.random().toString(36).slice(2,12);
+        localStorage.setItem('dv_clientId', id);
+      }
+      return id;
+    }
+    const clientId = getClientId();
+
+    // criar inputs de estrela (1..5) - comportamento correto: clicar em N preenche 1..N
+    for (let i = 1; i <= 5; i++) {
       const label = document.createElement("label");
-      label.style.cursor = "pointer";
       label.dataset.value = i;
       label.innerHTML = "★";
-
-      const input = document.createElement("input");
-      input.type = "radio";
-      input.name = "star";
-      input.value = i;
-      input.style.display = "none";
-      label.appendChild(input);
-
-     label.addEventListener("click", () => {
-  const val = Number(label.dataset.value); // valor da estrela clicada
-  document.querySelectorAll('input[name="star"]').forEach(inp => inp.checked = false);
-  input.checked = true;
-  document.querySelectorAll("#starInputs label").forEach(l => {
-    // agora colorimos as estrelas >= do valor clicado
-    l.style.color = (Number(l.dataset.value) >= val) ? "var(--gold)" : "#ccc";
-  });
-});
-
-
+      label.style.cursor = "pointer";
+      label.style.fontSize = "20px";
+      label.style.color = "#ccc";
+      label.addEventListener("click", () => {
+        selectedStars = Number(label.dataset.value);
+        document.querySelectorAll("#starInputs label").forEach(l => {
+          l.style.color = (Number(l.dataset.value) <= selectedStars) ? "var(--gold)" : "#ccc";
+        });
+      });
       starInputsEl.appendChild(label);
     }
-    document.querySelectorAll("#starInputs label").forEach(l => l.style.color = "#ccc");
 
-    // carregar avaliações do Firestore
-    async function loadReviewsFromFirebase() {
-      try {
-        const q = query(reviewsCol, orderBy("timestamp", "desc"));
-        const snapshot = await getDocs(q);
-        const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        reviewsListEl.innerHTML = "";
-        reviews.forEach(r => {
-          const el = document.createElement("div");
-          el.className = "review";
-          const stars = Number(r.stars) || 0;
-          // mostrar também o nome da pessoa
-          el.innerHTML = `<div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><div><strong>${r.name || 'Anônimo'}</strong></div><div>${r.text || ''}</div>`;
-          reviewsListEl.appendChild(el);
-        });
-        if (reviews.length > 0) {
-          const avg = (reviews.reduce((a,b)=>a+(Number(b.stars)||0),0)/reviews.length).toFixed(1);
-          reviewsAverageEl.textContent = `⭐ ${avg} — ${reviews.length} avaliação${reviews.length>1?'s':''}`;
-        } else {
-          reviewsAverageEl.textContent = "⭐ 0 — 0 avaliações";
+    // Função que renderiza reviews (usada tanto em load quanto em realtime)
+    function renderReviewsList(reviews){
+      reviewsListEl.innerHTML = "";
+      reviews.forEach(r => {
+        const el = document.createElement("div");
+        el.className = "review";
+
+        const starsCount = Number(r.stars) || 0;
+        const starsHtml = '<div class="stars">'+ '★'.repeat(starsCount) + '☆'.repeat(5-starsCount) +'</div>';
+
+        // data e hora (se precisar) — o Firestore retorna timestamp como objeto; tentamos mostrar se existir
+        let dateHtml = '';
+        if (r.timestamp && r.timestamp.toDate) {
+          const d = r.timestamp.toDate();
+          const day = String(d.getDate()).padStart(2,'0');
+          const month = String(d.getMonth()+1).padStart(2,'0');
+          const year = d.getFullYear();
+          const hh = String(d.getHours()).padStart(2,'0');
+          const mm = String(d.getMinutes()).padStart(2,'0');
+          dateHtml = `<div class="small-muted">Postado em ${day}/${month}/${year} às ${hh}:${mm}</div>`;
         }
-      } catch (e) {
-        console.error("Erro carregando avaliações:", e);
-      }
+
+        // conteúdo principal
+        el.innerHTML = `
+          ${starsHtml}
+          <div><strong>${r.name || 'Anônimo'}</strong> ${dateHtml}</div>
+          <div style="margin-top:6px">${r.text || ''}</div>
+        `;
+
+        // botão de excluir APENAS se o review.clientId existir e bater com o local
+        if (r.clientId && r.clientId === clientId) {
+          const delBtn = document.createElement('button');
+          delBtn.textContent = 'Excluir';
+          delBtn.className = 'delete-btn';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm('Deseja realmente excluir sua avaliação?')) return;
+            try {
+              await deleteDoc(doc(db, 'reviews', r.id));
+              // onSnapshot atualizará automaticamente
+            } catch (err) {
+              console.error('Erro ao excluir avaliação:', err);
+              alert('Não foi possível excluir a avaliação. Tente novamente.');
+            }
+          });
+          // coloca botão alinhado abaixo do texto
+          const wrap = document.createElement('div');
+          wrap.style.marginTop = '8px';
+          wrap.appendChild(delBtn);
+          el.appendChild(wrap);
+        }
+
+        reviewsListEl.appendChild(el);
+      });
     }
+
     // Atualização em tempo real das avaliações
-const qRealtime = query(reviewsCol, orderBy("timestamp", "desc"));
-onSnapshot(qRealtime, (snapshot) => {
-  const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  reviewsListEl.innerHTML = "";
-  reviews.forEach(r => {
-    const el = document.createElement("div");
-    el.className = "review";
-    const stars = Number(r.stars) || 0;
-    // mostrar também o nome da pessoa
-    el.innerHTML = `<div class="stars">${'★'.repeat(stars)+'☆'.repeat(5-stars)}</div><div><strong>${r.name || 'Anônimo'}</strong></div><div>${r.text || ''}</div>`;
-    reviewsListEl.appendChild(el);
-  });
-  if (reviews.length > 0) {
-    const avg = (reviews.reduce((a,b)=>a+(Number(b.stars)||0),0)/reviews.length).toFixed(1);
-    reviewsAverageEl.textContent = `⭐ ${avg} — ${reviews.length} avaliação${reviews.length>1?'s':''}`;
-  } else {
-    reviewsAverageEl.textContent = "⭐ 0 — 0 avaliações";
-  }
-});
+    const qRealtime = query(reviewsCol, orderBy("timestamp", "desc"));
+    onSnapshot(qRealtime, (snapshot) => {
+      const reviews = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      renderReviewsList(reviews);
+      if (reviews.length > 0) {
+        const avg = (reviews.reduce((a,b)=>a + (Number(b.stars)||0), 0) / reviews.length).toFixed(1);
+        reviewsAverageEl.textContent = `⭐ ${avg} — ${reviews.length} avaliação${reviews.length>1?'s':''}`;
+      } else {
+        reviewsAverageEl.textContent = "⭐ 0 — 0 avaliações";
+      }
+    }, (err) => {
+      console.error('Erro realtime reviews:', err);
+    });
 
-
-    // envio de avaliação
+    // envio de avaliação: usamos selectedStars (corrige bug que salvava sempre 1)
     document.getElementById("submitReview").addEventListener("click", async ()=>{
       try {
-        const stars = Number(document.querySelector('input[name="star"]:checked')?.value||0);
+        const stars = Number(selectedStars || 0);
         const text = document.getElementById("reviewText").value.trim();
         const name = document.getElementById("review-name").value.trim() || "Anônimo"; // pega o nome
         if(stars===0 || !text){ alert("Selecione estrelas e escreva seu comentário."); return; }
-        await addDoc(reviewsCol, { name, stars, text, timestamp: serverTimestamp() }); // salva com o name
+        await addDoc(reviewsCol, { name, stars, text, timestamp: serverTimestamp(), clientId }); // salva com o clientId
+        // limpa campos e UI
         document.getElementById("reviewText").value = "";
-        document.getElementById("review-name").value = ""; // limpa o campo do nome
-        document.querySelectorAll('input[name="star"]').forEach(i => i.checked = false);
+        document.getElementById("review-name").value = "";
+        selectedStars = 0;
         document.querySelectorAll("#starInputs label").forEach(l => l.style.color = "#ccc");
-        loadReviewsFromFirebase();
+        // onSnapshot fará o refresh automático
       } catch (err) {
         console.error("Erro ao enviar avaliação:", err);
         alert("Ocorreu um erro ao enviar sua avaliação. Verifique a configuração do Firebase no console.");
@@ -325,21 +355,92 @@ onSnapshot(qRealtime, (snapshot) => {
       window.scrollTo({top:card.offsetTop-20,behavior:"smooth"});
     });
 
-    loadReviewsFromFirebase();
-
     // ===================== Produtos & Carrinho =====================
-    const data={products:[
-      {id:1,name:'Cookie Tradicional',desc:'Feito com massa artesanal de baunilha, recheado com chocolate.',weight:'Aprox. 70g',price:9.99,image:'asserts/cookie.png'},
-      {id:2,name:'Afogadinho de Brownie — Dois Amores',desc:'Brownie macio com brigadeiro branco e preto.',weight:'Aprox. 250g',price:14.50,image:'asserts/afogadinho de brownie dois amores editado.png'},
-      {id:3,name:'Afogadinho de Brownie — Chocolate Branco',desc:'Brownie intenso com brigadeiro branco cremoso.',weight:'Aprox. 250g',price:14.50,image:'asserts/afogadinho de brownie brigadeiro chocolate branco editado.png'},
-      {id:4,name:'Mousse de Maracujá com Nutella',desc:'Mousse leve de maracujá com camadas de Nutella.',weight:'Aprox. 250g',price:14.70,image:'asserts/mousse de maracuja com nujtella editado.png'},
-      {id:5,name:'Bolo no Pote — Brigadeiro',desc:'Massa de chocolate recheada com brigadeiro.',weight:'Aprox. 250g',price:14.99,image:'asserts/bolo no pote chocolate.png'},
-      {id:6,name:'Bolo no Pote — Prestígio',desc:'Bolo de chocolate com recheio cremoso de coco.',weight:'Aprox. 250g',price:14.99,image:'asserts/Sobremesa de Chocolate e Creme.png'},
-      {id:7,name:'Bolo no Pote — Dois Amores',desc:'Camadas de brigadeiro preto e branco.',weight:'Aprox. 250g',price:14.99,image:'asserts/dois amores editado.png'},
-      {id:8,name:'Bolo no Pote — Maracujá Trufado',desc:'Massa leve com creme de maracujá.',weight:'Aprox. 250g',price:14.99,image:'asserts/bolo no pote maracujá2.png'},
-      {id:9,name:'Bolo no Pote — Cenoura com Brigadeiro',desc:'Bolo de cenoura com brigadeiro.',weight:'Aprox. 250g',price:14.99,image:'asserts/bolo no pote cenoura com chocolate.png'},
-      {id:10,name:'Mini Empadão de Frango com Requeijão',desc:'Massa podre com frango desfiado e requeijão.',weight:'Aprox. 350g',price:15.20,image:'asserts/mini empadão.png'}
-    ]};
+   const data = {
+  products: [
+    {
+      id: 1,
+      name: 'Cookie Tradicional',
+      desc: 'Cookie artesanal com massa douradinha de baunilha e generosas gotas de chocolate que derretem na boca. Crocante por fora e macio por dentro — impossível comer um só!',
+      weight: 'Aprox. 70g',
+      price: 9.99,
+      image: 'asserts/cookie.png'
+    },
+    {
+      id: 2,
+      name: 'Afogadinho de Brownie — Dois Amores',
+      desc: 'Um encontro perfeito de sabores! Brownie denso e úmido mergulhado em camadas de brigadeiro branco e preto — uma explosão de prazer em cada colherada.',
+      weight: 'Aprox. 250g',
+      price: 14.50,
+      image: 'asserts/afogadinho de brownie dois amores editado.png'
+    },
+    {
+      id: 3,
+      name: 'Afogadinho de Brownie — Chocolate Branco',
+      desc: 'Brownie intenso e molhadinho coberto com um brigadeiro branco cremoso e irresistível. A combinação perfeita entre o amargo do chocolate e a doçura na medida certa.',
+      weight: 'Aprox. 250g',
+      price: 14.50,
+      image: 'asserts/afogadinho de brownie brigadeiro chocolate branco editado.png'
+    },
+    {
+      id: 4,
+      name: 'Mousse de Maracujá com Nutella',
+      desc: 'Camadas leves e aeradas de mousse de maracujá contrastam com a cremosidade e o sabor marcante da Nutella. Uma sobremesa refrescante e simplesmente viciante!',
+      weight: 'Aprox. 250g',
+      price: 14.70,
+      image: 'asserts/mousse de maracuja com nujtella editado.png'
+    },
+    {
+      id: 5,
+      name: 'Bolo no Pote — Brigadeiro',
+      desc: 'Massa de chocolate super fofinha com um recheio generoso de brigadeiro caseiro. Um clássico dos apaixonados por chocolate, feito com muito amor e sabor!',
+      weight: 'Aprox. 250g',
+      price: 14.99,
+      image: 'asserts/bolo no pote chocolate.png'
+    },
+    {
+      id: 6,
+      name: 'Bolo no Pote — Prestígio',
+      desc: 'A harmonia perfeita entre o chocolate e o coco! Massa macia de chocolate com recheio cremoso de coco fresco e um brigadeiro delicioso. Um sabor nostálgico e irresistível.',
+      weight: 'Aprox. 250g',
+      price: 14.99,
+      image: 'asserts/Sobremesa de Chocolate e Creme.png'
+    },
+    {
+      id: 7,
+      name: 'Bolo no Pote — Dois Amores',
+      desc: 'Duas camadas de puro amor! Brigadeiro preto e branco se encontram entre duas massas leves e úmidas de chocolate e baunilha. Cremoso, equilibrado e cheio de sabor.',
+      weight: 'Aprox. 250g',
+      price: 14.99,
+      image: 'asserts/dois amores editado.png'
+    },
+    {
+      id: 8,
+      name: 'Bolo no Pote — Maracujá Trufado',
+      desc: 'Camadas delicadas de massa de chocolate com brigadeiro caseiro e um creme trufado de maracujá envolvente e refrescante. Doce na medida certa e com um toque tropical!',
+      weight: 'Aprox. 250g',
+      price: 14.99,
+      image: 'asserts/bolo no pote maracujá2.png'
+    },
+    {
+      id: 9,
+      name: 'Bolo no Pote — Cenoura com Brigadeiro',
+      desc: 'O clássico brasileiro em sua melhor versão! Bolo de cenoura super fofinho com cobertura farta de brigadeiro cremoso. Um pedacinho de carinho em cada colherada.',
+      weight: 'Aprox. 250g',
+      price: 14.99,
+      image: 'asserts/bolo no pote cenoura com chocolate.png'
+    },
+    {
+      id: 10,
+      name: 'Mini Empadão de Frango com Requeijão',
+      desc: 'Massa amanteigada e leve, recheada com frango desfiado temperado e requeijão cremoso. Um salgado caseiro e suculento, perfeito para qualquer momento do dia!',
+      weight: 'Aprox. 350g',
+      price: 15.20,
+      image: 'asserts/mini empadão.png'
+    }
+  ]
+};
+
 
     const WA_NUMBER='5583986153575';
     let cart=[];
@@ -458,7 +559,6 @@ onSnapshot(qRealtime, (snapshot) => {
 
 </body>
 </html>
-
 
 
 
